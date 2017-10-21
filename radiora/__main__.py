@@ -1,5 +1,4 @@
 #
-#
 # Console test harness.
 #
 # Copyright (C) 2017 Ralph Lipe <ralph@lipe.ws>
@@ -11,7 +10,6 @@ Console interface for testing and getting status of system.
 
 
 from radiora import RadioRA, FeedbackCommand
-from radiora.scene import ZONES
 import argparse
 from radiora.serialstub import SerialStub
 

@@ -1,6 +1,6 @@
 #
-#
-# Classes which help define scenes for a RadioRA installation
+# Classes which help define scenes for a RadioRA installation.  These classes are not required to use the functionality
+# of the package, but they can simplify the declaration of a set of scenes.  See the test files for samples.
 #
 # Copyright (C) 2017 Ralph Lipe <ralph@lipe.ws>
 #
@@ -8,17 +8,11 @@
 """\
 Scenes and devices
 """
+from radiora import RadioRA, STATE_ON, STATE_OFF
 
 import logging
 logger = logging.getLogger(__name__)
 
-from radiora import RadioRA
-
-
-PHANTOM_BUTTON_NUMBER_ALL_ON = 16
-PHANTOM_BUTTON_NUMBER_ALL_OFF = 17
-
-# TODO - figure out where phantom buttons live.  They are NOT controls there are more like scenes.
 
 class Scene:
     def __init__(self, names, supports_on=True, supports_off=True, supports_dim=True):
@@ -63,7 +57,7 @@ class PhantomButton(Scene):
     def off(self, radiora):
         assert self.supports_off
         state_to_set = STATE_OFF if self.button_number_off == self.button_number_on else STATE_ON
-        radiora.phantom_button_press(self.button_number_of, state_to_set)
+        radiora.phantom_button_press(self.button_number_off, state_to_set)
 
 
 class Zone(Scene):
@@ -107,9 +101,9 @@ class GrafikEye(Zone):
             self.scenes[key] = value
             print("    {0} = {1}".format(key, value))
         Zone.__init__(self, names, zone_number,
-                         supports_on='on' in kwargs.keys(),
-                         supports_off='off' in kwargs.keys(),
-                         supports_dim='dim' in kwargs.keys())
+                      supports_on='on' in kwargs.keys(),
+                      supports_off='off' in kwargs.keys(),
+                      supports_dim='dim' in kwargs.keys())
 
     def on(self, radiora):
         radiora.set_grafik_eye_scene(self.zone_number, self.scenes['on'])
@@ -142,13 +136,32 @@ class SubScene(Scene):
         radiora.set_grafik_eye_scene(self.grafik_eye.zone_number, self.off_scene_number)
 
 
+class CompositeScene(Scene):
+    def __init__(self, names, child_scenes):
+        self.child_scenes = child_scenes
+        supports_dim = True
+        for child in child_scenes:
+            supports_dim = supports_dim and child.supports_dim
+        Scene.__init__(self, names, supports_dim=supports_dim)
 
+    def on(self, rr):
+        for child in self.child_scenes:
+            child.on(rr)
+
+    def dim(self, rr):
+        for child in self.child_scenes:
+            child.dim(rr)
+
+    def off(self, rr):
+        for child in self.child_scenes:
+            child.off(rr)
 
 
 class SceneGroup(dict):
     def __init__(self, scenes=None):
         # If a caller wants a list of all scenes in this group they should not use the dictionary because there
         # are multiple keys per scene.  Use the SceneGroup.all_scenes member instead
+        dict.__init__(self)
         self.all_scenes = []
         if scenes is not None:
             self.add_scenes(scenes)
@@ -162,56 +175,3 @@ class SceneGroup(dict):
     def add_scenes(self, scenes):
         for scene in scenes:
             self.add_scene(scene)
-
-ZONES=SceneGroup( (
-    # Main Floor
-    GrafikEye(['family room', 'living room'], 13, off=0, on=1, dim=2, fireplace_on=3, fireplace_off=4),
-    GrafikEye('office', 15, off=0, on=1, dim=2, fireplace_on=3, fireplace_off=4),
-    GrafikEye('kitchen', 10, off=0, on=1, dim=2, cans=3, island=4),
-    GrafikEye(['nook', 'breakfast nook'], 11,  off=0, on=1, dim=2, desk=3, table=4),
-    GrafikEye('backyard', 12, off=0, on=1, patio=2, fireplace_on=3, path_only=4),
-    GrafikEye('front door', 9, all_off=0, entry_on=1, entry_dim=2, outside_on=3, outside_off=4),
-    Dimmer('laundry room', 25),
-    Dimmer('end of hall', 27),
-    Dimmer('dining room', 30),
-    Dimmer('powder lights', 21),
-    Dimmer('powder sink', 28),
-    Switch('fountain', 20),
-
-    # Upstairs
-    GrafikEye('stairs up', 8, off=0, on=1, dim=2, stairs_on=3, stairs_dim=4),
-    GrafikEye('master bedroom', 7, off=0, on=1, dim=2, fireplace_on=3, fireplace_off=4),
-    GrafikEye('master bathroom', 6, off=0, on=1, dim=2, fan_on=3, fan_off=4),
-    Dimmer('packing room', 17),
-    Dimmer('nicole bathroom', 29),
-    Dimmer('nicole bedroom', 16),
-    Dimmer('master toilet', 26),
-    Dimmer('master closet', 24),
-
-    # Downstairs
-    GrafikEye('basement', 14, off=0, on=1, dim=2, cabinets=3, pendants=4),
-    Dimmer('hall cans', 4),
-    Dimmer('hall sconces', 5),
-    Dimmer('stair cans', 31),
-    Dimmer('stair sconces', 32),
-    Dimmer('theater cans', 1),
-    Dimmer('theater background', 2),
-    Dimmer('bathroom', 23),
-    Dimmer('exercise room', 18),
-    Dimmer('james bedroom', 19),
-    Switch('garage', 22)
-    ))
-
-VIRTUAL_SCENES=SceneGroup( (
-    PhantomButton('hall', button_number_on=4, button_number_off=5),
-    PhantomButton('entry', button_number_on=6, button_number_off=7),
-    PhantomButton(['main', 'main floor'], button_number_on=8, button_number_off=9, button_number_dim=14),
-    SubScene('patio fireplace', ZONES['backyard'], 'fireplace on', 'path only')  # TODO: Is there a fire off hidden scene?
-    ) )
-
-VACATION_SCENES = SceneGroup()
-VACATION_SCENES.add_scene(ZONES['powder lights'])
-VACATION_SCENES.add_scene(ZONES['laundry room'])
-VACATION_SCENES.add_scene(ZONES['master bedroom'])
-VACATION_SCENES.add_scene(VIRTUAL_SCENES['entry'])
-VACATION_SCENES.add_scene(VIRTUAL_SCENES['hall'])

@@ -1,5 +1,4 @@
 #
-#
 # Simple serial port stub used for testing.
 #
 # Copyright (C) 2017 Ralph Lipe <ralph@lipe.ws>

@@ -1,12 +1,11 @@
 #
-#
 # Library for controlling Lutron RadioRA Chronos System Bridge
 #
 # Copyright (C) 2017 Ralph Lipe <ralph@lipe.ws>
 #
 # SPDX-License-Identifier:    MIT
 """\
-Serial testing support.
+Library for controlling Lutron RadioRA Chronos System Bridge
 """
 import serial
 
@@ -18,12 +17,10 @@ logger = logging.getLogger(__name__)
 
 STATE_ON = "ON"
 STATE_OFF = "OFF"
-STATE_TOGGLE = "TOG"  # Onlu used for set_switch_level
+STATE_TOGGLE = "TOG"  # Only used for set_switch_level
 STATE_CHANGE = "CHG"  # Only used feedback commands
 
-
-
-### -------------- FEEDBACK COMMAND
+# -------------- FEEDBACK COMMAND
 
 
 LOCAL_ZONE_CHANGE = "LZC"
@@ -93,35 +90,35 @@ class FeedbackCommand:
 
     @staticmethod
     def _parse_bitmap(value):
-        list = []
+        result = []
         for char in value:
-            if char == 1:
+            if char == '1':
                 val = True
-            elif char == 0:
+            elif char == '0':
                 val = False
             else:
                 assert char == 'X'
                 val = None
-            list.append(val)
-        return l
+            result.append(val)
+        return result
 
     def _set_led_states(self, value):
-        self.led_states = _parse_bitmap(value)
+        self.led_states = FeedbackCommand._parse_bitmap(value)
 
     def _set_zone_states(self, value):
-        self.zone_states = _parse_bitmap(value)
+        self.zone_states = FeedbackCommand._parse_bitmap(value)
 
 
 # ---------------- MAIN CLASS
 
 
 class RadioRA:
-    class _LineReader(LineReader):
+    class LineReader(LineReader):
         TERMINATOR = b'\r'
 
         def __init__(self, notify):
             self._notify = notify
-            super(RadioRA._LineReader, self).__init__()
+            super(RadioRA.LineReader, self).__init__()
 
         def handle_line(self, line):
             if self._notify:
@@ -140,7 +137,7 @@ class RadioRA:
                                               dsrdtr=use_hardware_handshaking)
         else:
             self._ser = port
-        self._thread = ReaderThread(self._ser, lambda: RadioRA._LineReader(notify))
+        self._thread = ReaderThread(self._ser, lambda: RadioRA.LineReader(notify))
         self._thread.start()
         transport, self._protocol = self._thread.connect()
 
