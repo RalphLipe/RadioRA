@@ -61,58 +61,64 @@ class PhantomButton(Scene):
 
 
 class Zone(Scene):
-    def __init__(self, names: [str], zone_number: int, supports_on=True, supports_off=True, supports_dim=True):
+    def __init__(self, names: [str], zone_number: int, system,
+                 supports_on=True, supports_off=True, supports_dim=True):
         Scene.__init__(self, names, supports_on=supports_on, supports_off=supports_off, supports_dim=supports_dim)
         self.zone_number = zone_number
+        self.system = system
+
+    @property
+    def system_number(self) -> int:
+        """Property always returns a number even if the system attribute is None.  If no system then returns 1."""
+        return 1 if self.system is None else self.system
 
 
 class Switch(Zone):
-    def __init__(self, names, zone_number):
-        Zone.__init__(self, names, zone_number, supports_dim=False)
+    def __init__(self, names, zone_number, system=None):
+        Zone.__init__(self, names, zone_number, system, supports_dim=False)
 
     def on(self, radiora: RadioRA):
-        radiora.set_switch_level(self.zone_number, STATE_ON)
+        radiora.set_switch_level(self.zone_number, STATE_ON, system=self.system)
 
     def off(self, radiora: RadioRA):
-        radiora.set_switch_level(self.zone_number, STATE_OFF)
+        radiora.set_switch_level(self.zone_number, STATE_OFF, system=self.system)
 
 
 class Dimmer(Zone):
-    def __init__(self, names, zone_number, dim_setting=50, on_setting=100):
-        Zone.__init__(self, names, zone_number)
+    def __init__(self, names, zone_number, system=None, dim_setting=50, on_setting=100):
+        Zone.__init__(self, names, zone_number, system)
         self.dim_setting = dim_setting
         self.on_setting = on_setting
 
     def on(self, radiora):
-        radiora.set_dimmer_level(self.zone_number, self.on_setting)
+        radiora.set_dimmer_level(self.zone_number, self.on_setting, system=self.system)
 
     def dim(self, radiora):
-        radiora.set_dimmer_level(self.zone_number, self.dim_setting)
+        radiora.set_dimmer_level(self.zone_number, self.dim_setting, system=self.system)
 
     def off(self, radiora):
-        radiora.set_dimmer_level(self.zone_number, 0)
+        radiora.set_dimmer_level(self.zone_number, 0, system=self.system)
 
 
 class GrafikEye(Zone):
-    def __init__(self, names, zone_number, **kwargs):
+    def __init__(self, names, zone_number, system=None, **kwargs):
         self.scenes = {}
         for key, value in kwargs.items():
             key = key.replace('_', ' ')   # take out all the underscores and replace them with spaces
             self.scenes[key] = value
-            print("    {0} = {1}".format(key, value))
-        Zone.__init__(self, names, zone_number,
+        Zone.__init__(self, names, zone_number, system,
                       supports_on='on' in kwargs.keys(),
                       supports_off='off' in kwargs.keys(),
                       supports_dim='dim' in kwargs.keys())
 
     def on(self, radiora):
-        radiora.set_grafik_eye_scene(self.zone_number, self.scenes['on'])
+        radiora.set_grafik_eye_scene(self.zone_number, self.scenes['on'], self.system)
 
     def dim(self, radiora):
-        radiora.set_grafik_eye_scene(self.zone_number, self.scenes['dim'])
+        radiora.set_grafik_eye_scene(self.zone_number, self.scenes['dim'], self.system)
 
     def off(self, radiora):
-        radiora.set_grafik_eye_scene(self.zone_number, self.scenes['off'])
+        radiora.set_grafik_eye_scene(self.zone_number, self.scenes['off'], self.system)
 
 
 class SubScene(Scene):
@@ -158,20 +164,54 @@ class CompositeScene(Scene):
 
 
 class SceneGroup(dict):
-    def __init__(self, scenes=None):
+    def __init__(self, scenes=()):
         # If a caller wants a list of all scenes in this group they should not use the dictionary because there
         # are multiple keys per scene.  Use the SceneGroup.all_scenes member instead
         dict.__init__(self)
+        self.zones = {1: {}, 2: {}}
         self.all_scenes = []
-        if scenes is not None:
-            self.add_scenes(scenes)
+        self.add_scenes(scenes)
 
     def add_scene(self, scene):
         self.all_scenes.append(scene)
         for name in scene.names:
-            print("ADDING {0}".format(name))
             self[name] = scene
+        if isinstance(scene, Zone):
+            self.zones[scene.system_number][scene.zone_number] = scene
 
     def add_scenes(self, scenes):
         for scene in scenes:
             self.add_scene(scene)
+
+
+class MasterControl:
+    def __init__(self, name, master_control_number, system=None, **kwargs):
+        """Buttons are a bi-directional lookup.  You can use a string or a button number"""
+        self.name = name
+        self.master_control_number = master_control_number
+        self.system = system
+        self.buttons = {}
+        for key, value in kwargs.items():
+            key = key.replace('_', ' ')   # take out all the underscores and replace them with spaces
+            self.buttons[key] = value
+            self.buttons[value] = key
+
+    @property
+    def system_number(self) -> int:
+        """Property always returns a number even if the system attribute is None.  If no system then returns 1."""
+        return 1 if self.system is None else self.system
+
+
+class MasterControlGroup(dict):
+    def __init__(self, controls=()):
+        dict.__init__(self)
+        self.controls = {1: {}, 2: {}}
+        self.add_controls(controls)
+
+    def add_control(self, control):
+        self[control.name] = control
+        self.controls[control.system_number][control.master_control_number] = control
+
+    def add_controls(self, controls):
+        for control in controls:
+            self.add_control(control)

@@ -9,7 +9,7 @@ Console interface for testing and getting status of system.
 """
 
 
-from radiora import RadioRA, FeedbackCommand
+from radiora import RadioRA, FeedbackCommand, MasterControlButtonPress
 import argparse
 from radiora.serialstub import SerialStub
 
@@ -17,8 +17,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def console_notify(e: FeedbackCommand):
-    logger.info(e.raw_command)
+def generic_feedback(feedback: FeedbackCommand):
+    print("Generic feedback: {0}".format(feedback.raw_command))
+    logger.info(feedback.raw_command)
+
+
+def master_control_button_press(feedback: MasterControlButtonPress):
+    print("Master control {0} button {1} pressed".format(feedback.master_control_number, feedback.button_number))
 
 
 if __name__ == "__main__":
@@ -35,7 +40,9 @@ if __name__ == "__main__":
         port = SerialStub()
         logger.info("Using test port")
 
-    with RadioRA(port, notify=console_notify) as rr:
+    with RadioRA(port) as rr:
+        rr.set_feedback_observer(None, generic_feedback)
+        rr.set_feedback_observer(MasterControlButtonPress, master_control_button_press)
         continue_running = True
 
         while continue_running:
