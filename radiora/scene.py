@@ -36,28 +36,34 @@ class Scene:
         assert not self.supports_off
         logger.debug("Scene.off() method called for class that does not support off()")
 
+    def __repr__(self):
+        return "Scene {0}".format(self.names[0])
+
 
 class PhantomButton(Scene):
     # Note that the default for a phantom button is that it does not support off.  If it is a room button, you can
     # set the button_number off to the same value.  If there are paired buttons (one turns thing off, and one turns
     # them on, then an "ON" command will be sent to the button_number_off because it is intended to turn off the
     # scene that the button_number_on turned on
-    def __init__(self, names, button_number_on, button_number_off=0, button_number_dim=0):
-        Scene.__init__(self, names, supports_off=(button_number_on != 0), supports_dim=(button_number_dim != 0))
-        self.button_number_on = button_number_on
-        self.button_number_off = button_number_off
-        self.button_number_dim = button_number_dim
+    def __init__(self, names, button_on=0, button_off=0, button_dim=0):
+        Scene.__init__(self, names,
+                       supports_on=(button_on != 0), supports_off=(button_off != 0), supports_dim=(button_dim != 0))
+        self.button_on = button_on
+        self.button_off = button_off
+        self.button_dim = button_dim
 
     def on(self, radiora):
-        radiora.phantom_button_press(self.button_number_on, STATE_ON)
+        if self.supports_on:
+            radiora.phantom_button_press(self.button_on, STATE_ON)
 
     def dim(self, radiora):
-        radiora.phantom_button_press(self.button_number_dim, STATE_ON)
+        if self.supports_dim:
+            radiora.phantom_button_press(self.button_dim, STATE_ON)
 
     def off(self, radiora):
-        assert self.supports_off
-        state_to_set = STATE_OFF if self.button_number_off == self.button_number_on else STATE_ON
-        radiora.phantom_button_press(self.button_number_off, state_to_set)
+        if self.supports_off:
+            state_to_set = STATE_OFF if self.button_off == self.button_on else STATE_ON
+            radiora.phantom_button_press(self.button_off, state_to_set)
 
 
 class Zone(Scene):

@@ -9,7 +9,7 @@ Console interface for testing and getting status of system.
 """
 
 
-from radiora import RadioRA, FeedbackCommand, MasterControlButtonPress
+from __init__ import RadioRA, FeedbackCommand, MasterControlButtonPress
 import argparse
 from radiora.serialstub import SerialStub
 

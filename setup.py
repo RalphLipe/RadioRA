@@ -3,7 +3,7 @@ from distutils.core import setup
 # noinspection SpellCheckingInspection
 setup(
     name='radiora',
-    version='1.0',
+    version='1.02',
     packages=['radiora'],
     url='https://github.com/ralphlipe/',
     license='BSD',
