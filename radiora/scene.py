@@ -8,7 +8,7 @@
 """\
 Scenes and devices
 """
-from radiora import RadioRA, STATE_ON, STATE_OFF
+from radiora import RadioRA, _MasterControlFeedback, LocalZoneChange, STATE_ON, STATE_OFF
 
 import logging
 logger = logging.getLogger(__name__)
@@ -55,19 +55,25 @@ class PhantomButton(Scene):
     def on(self, radiora):
         if self.supports_on:
             radiora.phantom_button_press(self.button_on, STATE_ON)
+        else:
+            Scene.on(self, radiora)
 
     def dim(self, radiora):
         if self.supports_dim:
             radiora.phantom_button_press(self.button_dim, STATE_ON)
+        else:
+            Scene.dim(self, radiora)
 
     def off(self, radiora):
         if self.supports_off:
             state_to_set = STATE_OFF if self.button_off == self.button_on else STATE_ON
             radiora.phantom_button_press(self.button_off, state_to_set)
+        else:
+            Scene.off(self, radiora)
 
 
 class Zone(Scene):
-    def __init__(self, names: [str], zone_number: int, system,
+    def __init__(self, names, zone_number, system,
                  supports_on=True, supports_off=True, supports_dim=True):
         Scene.__init__(self, names, supports_on=supports_on, supports_off=supports_off, supports_dim=supports_dim)
         self.zone_number = zone_number
@@ -77,6 +83,10 @@ class Zone(Scene):
     def system_number(self) -> int:
         """Property always returns a number even if the system attribute is None.  If no system then returns 1."""
         return 1 if self.system is None else self.system
+
+    def __repr__(self):
+        return "{0}, {1}, zone number {2}, system {3}".format(self.__class__, self.names[0],
+                                                              self.zone_number, self.system)
 
 
 class Switch(Zone):
@@ -118,13 +128,22 @@ class GrafikEye(Zone):
                       supports_dim='dim' in kwargs.keys())
 
     def on(self, radiora):
-        radiora.set_grafik_eye_scene(self.zone_number, self.scenes['on'], self.system)
+        if self.supports_on:
+            radiora.set_grafik_eye_scene(self.zone_number, self.scenes['on'], self.system)
+        else:
+            Zone.on(self, radiora)
 
     def dim(self, radiora):
-        radiora.set_grafik_eye_scene(self.zone_number, self.scenes['dim'], self.system)
+        if self.supports_dim:
+            radiora.set_grafik_eye_scene(self.zone_number, self.scenes['dim'], self.system)
+        else:
+            Zone.dim(self, radiora)
 
     def off(self, radiora):
-        radiora.set_grafik_eye_scene(self.zone_number, self.scenes['off'], self.system)
+        if self.supports_off:
+            radiora.set_grafik_eye_scene(self.zone_number, self.scenes['off'], self.system)
+        else:
+            Zone.off(self, radiora)
 
 
 class SubScene(Scene):
@@ -142,7 +161,10 @@ class SubScene(Scene):
         radiora.set_grafik_eye_scene(self.grafik_eye.zone_number, self.on_scene_number)
 
     def dim(self, radiora):
-        radiora.set_grafik_eye_scene(self.grafik_eye.zone_number, self.dim_scene_number)
+        if self.supports_dim:
+            radiora.set_grafik_eye_scene(self.grafik_eye.zone_number, self.dim_scene_number)
+        else:
+            Scene.dim(self, radiora)
 
     def off(self, radiora):
         radiora.set_grafik_eye_scene(self.grafik_eye.zone_number, self.off_scene_number)
@@ -189,6 +211,13 @@ class SceneGroup(dict):
         for scene in scenes:
             self.add_scene(scene)
 
+    def zone_for_feedback(self, feedback: LocalZoneChange) -> Zone:
+        """If there is a zone in this group for the specified feedback then it is returned, else None"""
+        if feedback.zone_number in self.zones[feedback.system_number]:
+            return self.zones[feedback.system_number][feedback.zone_number]
+        else:
+            return None
+
 
 class MasterControl:
     def __init__(self, name, master_control_number, system=None, **kwargs):
@@ -207,6 +236,9 @@ class MasterControl:
         """Property always returns a number even if the system attribute is None.  If no system then returns 1."""
         return 1 if self.system is None else self.system
 
+    def __repr__(self):
+        return "Master control {0}, number {1}, system {2}".format(self.name, self.master_control_number, self.system)
+
 
 class MasterControlGroup(dict):
     def __init__(self, controls=()):
@@ -221,3 +253,11 @@ class MasterControlGroup(dict):
     def add_controls(self, controls):
         for control in controls:
             self.add_control(control)
+
+    def control_for_feedback(self, feedback) -> MasterControl:
+        """If there is a master control in this group for the specified feedback then it is returned, else None"""
+        if (isinstance(feedback, _MasterControlFeedback)
+                and feedback.master_control_number in self.controls[feedback.system_number]):
+            return self.controls[feedback.system_number][feedback.master_control_number]
+        else:
+            return None
