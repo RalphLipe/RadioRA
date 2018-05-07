@@ -39,6 +39,10 @@ class Scene:
     def __repr__(self):
         return "Scene {0}".format(self.names[0])
 
+    def to_dict(self):
+        return {"names": self.names, "supportsOn": self.supports_on, "supportsDim": self.supports_dim,
+                "supportsOff": self.supports_off}
+
 
 class PhantomButton(Scene):
     # Note that the default for a phantom button is that it does not support off.  If it is a room button, you can
@@ -173,22 +177,45 @@ class SubScene(Scene):
 class CompositeScene(Scene):
     def __init__(self, names, child_scenes):
         self.child_scenes = child_scenes
-        supports_dim = True
+        supports_dim = False
         for child in child_scenes:
-            supports_dim = supports_dim and child.supports_dim
+            supports_dim = supports_dim or child.supports_dim
         Scene.__init__(self, names, supports_dim=supports_dim)
 
     def on(self, rr):
         for child in self.child_scenes:
             child.on(rr)
 
+    # If any child scene supports dim then this composite scene supports dim.  Children that do not support dim
+    # will be turned on.
     def dim(self, rr):
         for child in self.child_scenes:
-            child.dim(rr)
+            if child.supports_dim:
+                child.dim(rr)
+            else:
+                child.on(rr)
 
     def off(self, rr):
         for child in self.child_scenes:
             child.off(rr)
+
+
+# A UseScene has a single purpose and it may turn various child scenes either on, dim, or off.  The UseScene
+# will only support the on() action.
+class UseScene(Scene):
+    def __init__(self, names, on: [Scene] = (), dim: [Scene] = (), off: [Scene] = ()):
+        self.on_scenes = on
+        self.dim_scenes = dim
+        self.off_scenes = off
+        Scene.__init__(self, names, supports_on=True, supports_dim=False, supports_off=False)
+
+    def on(self, radiora):
+        for child in self.on_scenes:
+            child.on(radiora)
+        for child in self.dim_scenes:
+            child.dim(radiora)
+        for child in self.off_scenes:
+            child.off(radiora)
 
 
 class SceneGroup(dict):
@@ -217,6 +244,12 @@ class SceneGroup(dict):
             return self.zones[feedback.system_number][feedback.zone_number]
         else:
             return None
+
+    def to_list(self):
+        scene_list = []
+        for scene in self.all_scenes:
+            scene_list.append(scene.to_dict())
+        return scene_list
 
 
 class MasterControl:
